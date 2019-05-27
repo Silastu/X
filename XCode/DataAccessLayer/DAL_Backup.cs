@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using NewLife.Collections;
 using NewLife.Data;
 using NewLife.Model;
 using NewLife.Reflection;
@@ -97,7 +99,23 @@ namespace XCode.DataAccessLayer
 
             using (var fs = new FileStream(file2, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite))
             {
-                return Backup(table, fs);
+                var rs = 0;
+                if (file.EndsWithIgnoreCase(".gz"))
+                {
+                    using (var gs = new GZipStream(fs, CompressionLevel.Optimal, true))
+                    {
+                        rs = Backup(table, gs);
+                    }
+                }
+                else
+                {
+                    rs = Backup(table, fs);
+                }
+
+                // 截断文件
+                fs.SetLength(fs.Position);
+
+                return rs;
             }
         }
 
@@ -169,6 +187,12 @@ namespace XCode.DataAccessLayer
                     dt.Total = Total;
                     dt.WriteHeader(bn);
 
+                    // 输出日志
+                    var cs = dt.Columns;
+                    var ts = dt.Types;
+                    WriteLog("字段[{0}]：{1}", cs.Length, cs.Join());
+                    WriteLog("类型[{0}]：{1}", ts.Length, ts.Join(",", e => e.Name));
+
                     _writeHeader = true;
                 }
 
@@ -211,6 +235,12 @@ namespace XCode.DataAccessLayer
             var dt = new DbTable();
             dt.ReadHeader(bn);
             WriteLog("恢复[{0}/{1}]开始，共[{2:n0}]行", table.Name, ConnName, dt.Total);
+
+            // 输出日志
+            var cs = dt.Columns;
+            var ts = dt.Types;
+            WriteLog("字段[{0}]：{1}", cs.Length, cs.Join());
+            WriteLog("类型[{0}]：{1}", ts.Length, ts.Join(",", e => e.Name));
 
             var row = 0;
             var pageSize = 10_000;
@@ -272,7 +302,17 @@ namespace XCode.DataAccessLayer
 
             using (var fs = new FileStream(file2, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
-                return Restore(fs, table);
+                if (file.EndsWithIgnoreCase(".gz"))
+                {
+                    using (var gs = new GZipStream(fs, CompressionMode.Decompress, true))
+                    {
+                        return Restore(gs, table);
+                    }
+                }
+                else
+                {
+                    return Restore(fs, table);
+                }
             }
         }
 

@@ -361,8 +361,9 @@ namespace NewLife.Caching
                 var client = Pool.Get();
                 try
                 {
-                    var rs = client.Execute<String>("KEYS", "*");
-                    return rs.Split(Environment.NewLine).ToList();
+                    var rs = client.Execute<String[]>("KEYS", "*");
+                    //return rs.Split(Environment.NewLine).ToList();
+                    return rs;
                 }
                 finally
                 {
@@ -474,7 +475,7 @@ namespace NewLife.Caching
         /// <returns></returns>
         public override Boolean Add<T>(String key, T value, Int32 expire = -1)
         {
-            if (expire < 0) expire = Expire;
+            //if (expire < 0) expire = Expire;
 
             if (expire <= 0)
                 return Execute(key, rds => rds.Execute<Int32>("SETNX", key, value) == 1, true);
