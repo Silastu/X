@@ -80,7 +80,7 @@ namespace XCode.DataAccessLayer
         {
             base.OnSetConnectionString(builder);
 
-            var flag = Factory.GetType().FullName.StartsWith("System.Data");
+            var flag = Factory != null && Factory.GetType().FullName.StartsWith("System.Data");
             if (flag)
             {
                 //// 正常情况下INSERT, UPDATE和DELETE语句不返回数据。 当开启count-changes，以上语句返回一行含一个整数值的数据——该语句插入，修改或删除的行数。
@@ -761,21 +761,17 @@ namespace XCode.DataAccessLayer
             if (File.Exists(bf)) File.Delete(bf);
 
             using (var conn = Database.Factory.CreateConnection())
+            using (var conn2 = Database.OpenConnection())
             {
-                var conn2 = Database.Pool.Get();
-                try
-                {
-                    conn.ConnectionString = "Data Source={0}".F(bf);
-                    conn.Open();
+                conn.ConnectionString = "Data Source={0}".F(bf);
+                conn.Open();
 
-                    //var method = conn.GetType().GetMethodEx("BackupDatabase");
-                    // 借助BackupDatabase函数可以实现任意两个SQLite之间倒数据，包括内存数据库
-                    conn2.Invoke("BackupDatabase", conn, "main", "main", -1, null, 0);
-                }
-                finally
-                {
-                    Database.Pool.Put(conn2);
-                }
+                //conn2.ConnectionString = Database.ConnectionString;
+                //conn2.Open();
+
+                //var method = conn.GetType().GetMethodEx("BackupDatabase");
+                // 借助BackupDatabase函数可以实现任意两个SQLite之间倒数据，包括内存数据库
+                conn2.Invoke("BackupDatabase", conn, "main", "main", -1, null, 0);
             }
 
             // 压缩

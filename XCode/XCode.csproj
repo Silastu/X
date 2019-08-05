@@ -1,15 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net45;netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>net45;netstandard2.0;net40</TargetFrameworks>
     <AssemblyName>XCode</AssemblyName>
     <RootNamespace>XCode</RootNamespace>
     <AssemblyTitle>数据中间件</AssemblyTitle>
     <Description>数据中间件，MySQL、SQLite、SqlServer、Oracle</Description>
     <Company>新生命开发团队</Company>
     <Copyright>©2002-2019 新生命开发团队</Copyright>
-    <Version>9.11.2019.0510</Version>
-    <FileVersion>9.11.2019.0510</FileVersion>
-    <AssemblyVersion>9.11.*</AssemblyVersion>
+    <Version>9.13.2019.0706</Version>
+    <FileVersion>9.13.2019.0706</FileVersion>
+    <AssemblyVersion>9.12.*</AssemblyVersion>
     <Deterministic>false</Deterministic>
     <OutputPath>..\..\Bin</OutputPath>
     <DocumentationFile>$(OutputPath)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
@@ -26,17 +26,13 @@
     <RepositoryUrl>https://github.com/NewLifeX/X</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>新生命团队;X组件;NewLife;$(AssemblyName)</PackageTags>
-    <PackageReleaseNotes>改进数据备份</PackageReleaseNotes>
+    <PackageReleaseNotes>合并NET40分支</PackageReleaseNotes>
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSource>true</IncludeSource>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0-*" PrivateAssets="All" />
-  </ItemGroup>
 
   <ItemGroup>
     <Compile Remove="build\**" />
@@ -55,10 +51,18 @@
     <DefineConstants>$(DefineConstants);__WIN__</DefineConstants>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(TargetFramework)'=='net40'">
+    <DefineConstants>$(DefineConstants);__WIN__;NET4</DefineConstants>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)'=='net45'">
@@ -67,7 +71,14 @@
     <Reference Include="System.Web.Extensions" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(TargetFramework)'=='net40'">
+    <Reference Include="System.Data" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Extensions" />
+  </ItemGroup>
+
   <ItemGroup>
+    <Compile Remove="DataAccessLayer\Common\ConnectionPool.cs" />
     <Compile Remove="DataAccessLayer\Database\Firebird.cs" />
     <Compile Remove="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -101,6 +112,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Membership\生成实体类.log">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>生成实体类.tt</DependentUpon>
+    </None>
     <None Update="Membership\生成实体类.tt">
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>生成实体类.log</LastGenOutput>

@@ -6,6 +6,9 @@ using NewLife.Log;
 using NewLife.Messaging;
 using NewLife.Net;
 using NewLife.Threading;
+#if !NET4
+using TaskEx = System.Threading.Tasks.Task;
+#endif
 
 namespace NewLife.Remoting
 {
@@ -169,7 +172,10 @@ namespace NewLife.Remoting
         public virtual async Task<Object> InvokeAsync(Type resultType, String action, Object args = null, Byte flag = 0)
         {
             // 让上层异步到这直接返回，后续代码在另一个线程执行
-            await Task.Yield();
+            //!!! Task.Yield会导致强制捕获上下文，虽然会在另一个线程执行，但在UI线程中可能无法抢占上下文导致死锁
+#if !NET4
+            //await Task.Yield();
+#endif
 
             Open();
 
@@ -177,16 +183,16 @@ namespace NewLife.Remoting
 
             try
             {
-                return await ApiHostHelper.InvokeAsync(this, this, resultType, act, args, flag);
+                return await ApiHostHelper.InvokeAsync(this, this, resultType, act, args, flag).ConfigureAwait(false);
             }
             catch (ApiException ex)
             {
                 // 重新登录后再次调用
                 if (ex.Code == 401)
                 {
-                    await Cluster.InvokeAsync(client => OnLoginAsync(client, true));
+                    await Cluster.InvokeAsync(client => OnLoginAsync(client, true)).ConfigureAwait(false);
 
-                    return await ApiHostHelper.InvokeAsync(this, this, resultType, act, args, flag);
+                    return await ApiHostHelper.InvokeAsync(this, this, resultType, act, args, flag).ConfigureAwait(false);
                 }
 
                 throw;
@@ -207,7 +213,7 @@ namespace NewLife.Remoting
         public virtual async Task<TResult> InvokeAsync<TResult>(String action, Object args = null, Byte flag = 0)
         {
             // 发送失败时，返回空
-            var rs = await InvokeAsync(typeof(TResult), action, args, flag);
+            var rs = await InvokeAsync(typeof(TResult), action, args, flag).ConfigureAwait(false);
             if (rs == null) return default;
 
             return (TResult)rs;
@@ -221,7 +227,7 @@ namespace NewLife.Remoting
         public virtual TResult Invoke<TResult>(String action, Object args = null, Byte flag = 0)
         {
             // 发送失败时，返回空
-            var rs = InvokeAsync(typeof(TResult), action, args, flag).Result;
+            var rs = TaskEx.Run(() => InvokeAsync(typeof(TResult), action, args, flag)).Result;
             if (rs == null) return default;
 
             return (TResult)rs;
@@ -253,7 +259,7 @@ namespace NewLife.Remoting
         {
             var act = action;
 
-            return (TResult)await ApiHostHelper.InvokeAsync(this, client, typeof(TResult), act, args, flag);
+            return (TResult)await ApiHostHelper.InvokeAsync(this, client, typeof(TResult), act, args, flag).ConfigureAwait(false);
         }
 
         Task<IMessage> IApiSession.SendAsync(IMessage msg) => Cluster.InvokeAsync(client => client.SendMessageAsync(msg)).ContinueWith(t => t.Result as IMessage);
@@ -274,15 +280,17 @@ namespace NewLife.Remoting
         /// <summary>连接后自动登录</summary>
         /// <param name="client">客户端</param>
         /// <param name="force">强制登录</param>
-        protected virtual Task<Object> OnLoginAsync(ISocketClient client, Boolean force) => Task.FromResult<Object>(null);
+        protected virtual Task<Object> OnLoginAsync(ISocketClient client, Boolean force) => TaskEx.FromResult<Object>(null);
 
         /// <summary>登录</summary>
         /// <returns></returns>
         public virtual async Task<Object> LoginAsync()
         {
-            await Task.Yield();
+#if !NET4
+            //await Task.Yield();
+#endif
 
-            return await Cluster.InvokeAsync(client => OnLoginAsync(client, false));
+            return await Cluster.InvokeAsync(client => OnLoginAsync(client, false)).ConfigureAwait(false);
         }
         #endregion
 

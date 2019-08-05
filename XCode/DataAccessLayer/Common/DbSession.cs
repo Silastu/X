@@ -7,7 +7,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web;
 using NewLife;
 using NewLife.Collections;
 using NewLife.Data;
@@ -46,7 +45,7 @@ namespace XCode.DataAccessLayer
             catch (ObjectDisposedException) { }
             catch (Exception ex)
             {
-                WriteLog("执行" + DbType.ToString() + "的Dispose时出错：" + ex.ToString());
+                WriteLog("执行" + Database.Type + "的Dispose时出错：" + ex);
             }
         }
         #endregion
@@ -55,14 +54,14 @@ namespace XCode.DataAccessLayer
         /// <summary>数据库</summary>
         public IDatabase Database { get; }
 
-        /// <summary>返回数据库类型。外部DAL数据库类请使用Other</summary>
-        private DatabaseType DbType => Database.Type;
+        ///// <summary>返回数据库类型。外部DAL数据库类请使用Other</summary>
+        //private DatabaseType DbType => Database.Type;
 
-        /// <summary>工厂</summary>
-        private DbProviderFactory Factory => Database.Factory;
+        ///// <summary>工厂</summary>
+        //private DbProviderFactory Factory => Database.Factory;
 
-        /// <summary>链接字符串，会话单独保存，允许修改，修改不会影响数据库中的连接字符串</summary>
-        public String ConnectionString { get; set; }
+        ///// <summary>链接字符串，会话单独保存，允许修改，修改不会影响数据库中的连接字符串</summary>
+        //public String ConnectionString { get; set; }
 
         ///// <summary>数据连接对象。</summary>
         //public DbConnection Conn { get; protected set; }
@@ -104,6 +103,33 @@ namespace XCode.DataAccessLayer
             else
                 return new XSqlException(sql, this);
         }
+
+        /// <summary>打开连接并执行操作</summary>
+        /// <typeparam name="TResult"></typeparam>
+        /// <param name="callback"></param>
+        /// <returns></returns>
+        public virtual TResult Process<TResult>(Func<DbConnection, TResult> callback)
+        {
+            using (var conn = Database.OpenConnection())
+            {
+                return callback(conn);
+            }
+        }
+
+        ///// <summary>打开连接并执行操作</summary>
+        ///// <typeparam name="TResult"></typeparam>
+        ///// <param name="callback"></param>
+        ///// <returns></returns>
+        //public virtual async Task<TResult> ProcessAsync<TResult>(Func<DbConnection, Task<TResult>> callback)
+        //{
+        //    using (var conn = Database.Factory.CreateConnection())
+        //    {
+        //        conn.ConnectionString = Database.ConnectionString;
+        //        await conn.OpenAsync();
+
+        //        return await callback(conn);
+        //    }
+        //}
         #endregion
 
         #region 事务
@@ -212,7 +238,7 @@ namespace XCode.DataAccessLayer
         {
             return Execute(cmd, true, cmd2 =>
             {
-                using (var da = Factory.CreateDataAdapter())
+                using (var da = Database.Factory.CreateDataAdapter())
                 {
                     da.SelectCommand = cmd2;
 
@@ -311,24 +337,28 @@ namespace XCode.DataAccessLayer
 
             var text = WriteSQL(cmd);
 
-            DbConnection conn = null;
-            try
+            return Process(conn =>
             {
-                if (cmd.Connection == null) cmd.Connection = conn = Database.Pool.Get();
+                //DbConnection conn = null;
+                try
+                {
+                    //if (cmd.Connection == null) cmd.Connection = conn = Database.Pool.Get();
+                    if (cmd.Connection == null) cmd.Connection = conn;
 
-                BeginTrace();
-                return callback(cmd);
-            }
-            catch (DbException ex)
-            {
-                throw OnException(ex, cmd, text);
-            }
-            finally
-            {
-                if (conn != null) Database.Pool.Put(conn);
+                    BeginTrace();
+                    return callback(cmd);
+                }
+                catch (DbException ex)
+                {
+                    throw OnException(ex, cmd, text);
+                }
+                finally
+                {
+                    //if (conn != null) Database.Pool.Put(conn);
 
-                EndTrace(cmd, text);
-            }
+                    EndTrace(cmd, text);
+                }
+            });
         }
 
         /// <summary>执行插入语句并返回新增行的自动编号</summary>
@@ -434,7 +464,7 @@ namespace XCode.DataAccessLayer
         /// <returns></returns>
         protected virtual DbCommand OnCreateCommand(String sql, CommandType type = CommandType.Text, params IDataParameter[] ps)
         {
-            var cmd = Factory?.CreateCommand();
+            var cmd = Database.Factory?.CreateCommand();
             if (cmd == null) return null;
 
             //if (!Opened) Open();
@@ -504,15 +534,7 @@ namespace XCode.DataAccessLayer
             var dt = db._SchemaCache[key];
             if (dt == null)
             {
-                var conn2 = conn ?? Database.Pool.Get();
-                try
-                {
-                    dt = GetSchemaInternal(conn2, key, collectionName, restrictionValues);
-                }
-                finally
-                {
-                    if (conn == null) Database.Pool.Put(conn2);
-                }
+                dt = Process(conn2 => GetSchemaInternal(conn2, key, collectionName, restrictionValues));
 
                 db._SchemaCache[key] = dt;
             }
@@ -593,6 +615,7 @@ namespace XCode.DataAccessLayer
 
         private String GetSql(DbCommand cmd)
         {
+            var max = (Database as DbBase).SQLMaxLength;
             try
             {
                 var sql = cmd.CommandText;
@@ -625,8 +648,11 @@ namespace XCode.DataAccessLayer
                     sql = sb.Put(true);
                 }
 
-                // 阶段超长字符串
-                if (sql.Length > 1024) sql = sql.Substring(0, 512) + "..." + sql.Substring(sql.Length - 512);
+                // 截断超长字符串
+                if (max > 0)
+                {
+                    if (sql.Length > max && sql.StartsWithIgnoreCase("Insert")) sql = sql.Substring(0, max / 2) + "..." + sql.Substring(sql.Length - max / 2);
+                }
 
                 return sql;
             }

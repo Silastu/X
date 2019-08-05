@@ -339,10 +339,15 @@ namespace NewLife.Agent
             if (cur < max) return false;
 
             // 执行一次GC回收
+#if NET4
+            GC.Collect(2, GCCollectionMode.Forced);
+#else
             GC.Collect(2, GCCollectionMode.Forced, false);
+#endif
 
             // 再次判断内存
             cur = GC.GetTotalMemory(true);
+            cur = cur / 1024 / 1024;
             if (cur < max) return false;
 
             WriteLog("当前进程占用内存 {0:n0}M，超过阀值 {1:n0}M，准备重新启动！", cur, max);
@@ -514,10 +519,10 @@ namespace NewLife.Agent
 
                 // 兼容dotnet
                 var args = Environment.GetCommandLineArgs();
-                if (args.Length >= 1 && exe.EqualIgnoreCase("dotnet", "dotnet.exe"))
+                if (args.Length >= 1 && Path.GetFileName(exe).EqualIgnoreCase("dotnet", "dotnet.exe"))
                     exe += " " + args[0].GetFullPath();
-                else
-                    exe = exe.GetFullPath();
+                //else
+                //    exe = exe.GetFullPath();
 
                 var bin = GetBinPath(exe);
                 ServiceHelper.RunSC($"create {name} BinPath= \"{bin}\" start= auto DisplayName= \"{DisplayName}\"");

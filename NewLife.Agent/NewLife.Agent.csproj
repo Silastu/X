@@ -7,9 +7,9 @@
     <Description>应用程序注册为系统服务，仅支持Windows</Description>
     <Company>新生命开发团队</Company>
     <Copyright>©2002-2019 新生命开发团队</Copyright>
-    <Version>8.1.2019.0510</Version>
-    <FileVersion>8.1.2019.0510</FileVersion>
-    <AssemblyVersion>8.1.*</AssemblyVersion>
+    <Version>8.2.2019.0706</Version>
+    <FileVersion>8.2.2019.0706</FileVersion>
+    <AssemblyVersion>8.2.*</AssemblyVersion>
     <Deterministic>false</Deterministic>
     <OutputPath>..\..\Bin</OutputPath>
     <DocumentationFile>$(OutputPath)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
@@ -32,22 +32,18 @@
     <IncludeSource>true</IncludeSource>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0-*" PrivateAssets="All"/>
-  </ItemGroup>
-
   <PropertyGroup Condition="'$(TargetFramework)'=='netstandard2.0'">
     <DefineConstants>$(DefineConstants);NETSTANDARD2_0</DefineConstants>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(TargetFramework)'=='net45'">
-    <DefineConstants>$(DefineConstants);__WIN__</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>

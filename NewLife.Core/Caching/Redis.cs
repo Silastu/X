@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using NewLife.Collections;
+using NewLife.Data;
 using NewLife.Log;
 using NewLife.Model;
 using NewLife.Net;
@@ -89,6 +90,9 @@ namespace NewLife.Caching
         /// <summary>目标数据库。默认0</summary>
         public Int32 Db { get; set; }
 
+        /// <summary>读写超时时间。默认3000ms</summary>
+        public Int32 Timeout { get; set; } = 3_000;
+
         /// <summary>出错重试次数。如果出现协议解析错误，可以重试的次数，默认3</summary>
         public Int32 Retry { get; set; } = 3;
 
@@ -166,28 +170,7 @@ namespace NewLife.Caching
         {
             public Redis Instance { get; set; }
 
-            protected override RedisClient OnCreate()
-            {
-                var rds = Instance;
-                var svr = rds.Server;
-                if (svr.IsNullOrEmpty()) throw new ArgumentNullException(nameof(rds.Server));
-
-                if (!svr.Contains("://")) svr = "tcp://" + svr;
-
-                var uri = new NetUri(svr);
-                if (uri.Port == 0) uri.Port = 6379;
-
-                var rc = new RedisClient
-                {
-                    Server = uri,
-                    Password = rds.Password,
-                };
-
-                rc.Log = rds.Log;
-                if (rds.Db > 0) rc.Select(rds.Db);
-
-                return rc;
-            }
+            protected override RedisClient OnCreate() => Instance.OnCreate();
 
             protected override Boolean OnGet(RedisClient value)
             {
@@ -196,6 +179,32 @@ namespace NewLife.Caching
 
                 return base.OnGet(value);
             }
+        }
+
+        /// <summary>创建连接客户端</summary>
+        /// <returns></returns>
+        protected virtual RedisClient OnCreate()
+        {
+            var svr = Server;
+            if (svr.IsNullOrEmpty()) throw new ArgumentNullException(nameof(Server));
+
+            if (!svr.Contains("://")) svr = "tcp://" + svr;
+
+            var uri = new NetUri(svr);
+            if (uri.Port == 0) uri.Port = 6379;
+
+            var rc = new RedisClient
+            {
+                Host = this,
+                Server = uri,
+                //Password = rds.Password,
+                //Db = rds.Db,
+            };
+
+            rc.Log = Log;
+            //if (rds.Db > 0) rc.Select(rds.Db);
+
+            return rc;
         }
 
         private MyPool _Pool;
@@ -372,6 +381,17 @@ namespace NewLife.Caching
             }
         }
 
+        /// <summary>获取信息</summary>
+        /// <returns></returns>
+        public virtual IDictionary<String, String> GetInfo()
+        {
+            var rs = Execute(null, rds => rds.Execute("INFO", "all") as Packet);
+            if (rs == null || rs.Count == 0) return null;
+
+            var inf = rs.ToStr();
+            return inf.SplitAsDictionary(":", "\r\n");
+        }
+
         /// <summary>单个实体项</summary>
         /// <param name="key">键</param>
         /// <param name="value">值</param>
@@ -388,7 +408,7 @@ namespace NewLife.Caching
 
         /// <summary>获取单体</summary>
         /// <param name="key">键</param>
-        public override T Get<T>(String key) => Execute(key,rds => rds.Execute<T>("GET", key));
+        public override T Get<T>(String key) => Execute(key, rds => rds.Execute<T>("GET", key));
 
         /// <summary>批量移除缓存项</summary>
         /// <param name="keys">键集合</param>
